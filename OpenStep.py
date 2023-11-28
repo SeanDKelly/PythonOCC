@@ -115,9 +115,10 @@ t = TopologyExplorer(shp)
 props = GProp_GProps()
 shp_idx = 1
 for face in t.faces():
-    BRepGProp_Face(face)
-    brepgprop_SurfaceProperties(face, props)
-    face_surf = props.Mass()
+    Face = BRepGProp_Face(face)
+    Normal = Face.Normal()
+    #brepgprop_SurfaceProperties(face, props)
+    #face_surf = props.Mass()
     #normal_vector = props.PrincipalProperties()
     #print('Normal Vektor:',normal_vector)
     print("Surface for face nbr %i : %f" % (shp_idx, face_surf))
