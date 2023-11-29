@@ -12,7 +12,9 @@ Basiert auf dieser Anleitung: http://analysissitus.org/forum/index.php?threads/p
 2. Conda pakete installieren die OCC und die dazugehörige python lib installieren
 
     conda create -n pyoccenv python=3.8
+   
     conda activate pyoccenv
+   
     conda install -c conda-forge pythonocc-core
 
 Starten ------------------------------------
