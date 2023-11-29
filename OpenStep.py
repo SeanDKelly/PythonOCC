@@ -18,7 +18,7 @@ from OCC.Core.TopoDS import topods
 import OCC.Core.TopExp
 from OCC.Core.GProp import GProp_GProps, GProp_CenterMassX, GProp_CenterMassY
 
-"""
+
 def import_as_one_shape(event=None):
     #shp = read_step_file(os.path.join("..", "assets", "models", "as1_pe_203.stp"))
     shp = read_step_file(os.path.join("Antriebswelle.STEP"))
@@ -123,3 +123,4 @@ for face in t.faces():
     #print('Normal Vektor:',normal_vector)
     print("Surface for face nbr %i : %f" % (shp_idx, face_surf))
     shp_idx += 1
+"""
