@@ -117,39 +117,3 @@ if __name__ == "__main__":
     add_menu("STEP import")
     add_function_to_menu("STEP import", import_as_one_shape)
     #add_function_to_menu("STEP import", import_as_multiple_shapes)
-    start_display()
-    #import_as_one_shape()
-"""
-
-
-if __name__ == "__main__":
-    face_locations_relative = []
-    # STEP datei einlesen. Wird als shape gespeichert
-    shp = read_step_file(os.path.join("Antriebswelle.STEP"))
-
-    face_explorer = TopExp_Explorer(shp,TopAbs.TopAbs_FACE)
-
-    # Create a GProp_GProps object to store the properties
-    gprops = GProp_GProps()
-
-    # Compute properties
-    #BRep_Tool.SurfaceProperties(topo_shape, gprops)
-    brepgprop_VolumeProperties(shp, gprops)
-
-    while face_explorer.More():
-        current_face = face_explorer.Current()
-
-        # Get the location (transformation) of the face relative to the shape
-        face_location_relative = TopLoc.TopLoc_Location()
-
-        print('Loc:',face_location_relative)
-
-        # If the face has a location (transformation)
-        if current_face.Location().IsEqual(face_location_relative, 1e-10):
-            face_locations_relative.append(face_location_relative)
-
-        face_explorer.Next()
-
-    # Print or use the list of relative face locations as needed
-    print("Relative Face Locations:", face_locations_relative)
-"""
