@@ -9,7 +9,9 @@ Basiert auf dieser Anleitung: http://analysissitus.org/forum/index.php?threads/p
 
   https://www.anaconda.com/download
 
-2. Conda pakete installieren die OCC und die dazugehörige python lib installieren
+2. Conda pakete installieren die OCC und die dazugehörige python lib installieren.
+    Dafür die Conda promt öffnen. Ist ein Komandozeilen programm das mit conda installiert wird und
+   kann wie jedes ander Programm in Windows gesucht werden.
 
     conda create -n pyoccenv python=3.8
    
