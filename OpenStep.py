@@ -1,31 +1,43 @@
 from __future__ import print_function
-
-import random
 import os
 import os.path
-import sys
+import time
 
-from OCC.Core.Quantity import Quantity_Color, Quantity_TOC_RGB
-from OCC.Display.SimpleGui import init_display
 
-from OCC.Extend.TopologyUtils import TopologyExplorer
+from OCC.Extend.TopologyUtils import TopologyExplorer, TopoDS_Face
 from OCC.Extend.DataExchange import read_step_file
 
+from OCC.Core.gp import gp_Pnt, gp_Vec, gp_Dir
+
+# Topologie Pakete -----------------------------------------------------------------------------------
+# Ein Modell besteht in aller regel aus mehreen primitven formen. Eine Welle z.B. aus verschiedenen 
+# Zylindern und Kegeln und auch Endflächen. Die Topologie beschreibt dann wie diese Primitven Formen 
+# zusammengeschnürt werden müssen also wie diese Formen relativ zueinander stehen müssen
+# um das gesamte Modell darzustellen.
+from OCC.Core.TopoDS import topods, TopoDS_Face, TopoDS_Edge, TopoDS_Shape # DS == Data Struktur
+from OCC.Core import TopLoc # paket bietet Ressourcen für den Umgang mit lokalen 3D-Koordinatensystemen
+# topologie pakete um die topologien zu bearbeiten 
+import OCC.Core.TopTools
+from OCC.Core.TopExp import TopExp_Explorer # Um Topologie eines gegenstand zu untersuchen
+from OCC.Core import BRepTools, TopAbs
+
+
+# Bearbeitungs Pakete ---------------------------------------------------------------------------------
 from OCC.Core.BRep import BRep_Tool
-from OCC.Core.BRepGProp import brepgprop_VolumeProperties, brepgprop_SurfaceProperties, BRepGProp_Face
-import OCC.Core.BRepGProp as BRP
-from OCC.Core.TopoDS import topods
-import OCC.Core.TopExp
-from OCC.Core.GProp import GProp_GProps, GProp_CenterMassX, GProp_CenterMassY
+from OCC.Core.BRepGProp import brepgprop_SurfaceProperties, brepgprop_VolumeProperties, BRepGProp_Face, BRepGProp_Vinert
+from OCC.Core.GeomLProp import GeomLProp_SLProps # Um die krümmung einer Fläche zu bestimmen
+from OCC.Core.GProp import GProp_GProps
 
-"""
+# Visu Pakete --------------------------------------------------------------------------------------------
+from OCC.Display.SimpleGui import init_display
+from OCC.Core.AIS import AIS_ColoredShape
+from OCC.Display.OCCViewer import rgb_color
+
 def import_as_one_shape(event=None):
-    #shp = read_step_file(os.path.join("..", "assets", "models", "as1_pe_203.stp"))
+    # STEP datei einlesen. Wird als shape gespeichert
     shp = read_step_file(os.path.join("Antriebswelle.STEP"))
-    
 
-    # Convert the shape to a TopoDS_Shape
-    #topo_shape = topods.TopoDS_Shape(shp)
+    ais_shp = AIS_ColoredShape(shp)
 
     # Create a GProp_GProps object to store the properties
     gprops = GProp_GProps()
@@ -46,80 +58,97 @@ def import_as_one_shape(event=None):
 
     # then loop over faces
     t = TopologyExplorer(shp)
+    
     props = GProp_GProps()
     shp_idx = 1
+
     for face in t.faces():
-        BRepGProp_Face(face)
-        brepgprop_SurfaceProperties(face, props)
-        face_surf = props.Mass()
-        #normal_vector = props.PrincipalProperties()
-        #print('Normal Vektor:',normal_vector)
-        print("Surface for face nbr %i : %f" % (shp_idx, face_surf))
+        print('---Face '+str(shp_idx)+'---')
+        #location = face.Location()
+        loc = face.Located()
+        
+        print('Loc',face.Located())
+        
+        h_srf = BRep_Tool.Surface(face)
+        u = 0.0
+        v = 0.0
+        curvature = GeomLProp_SLProps(h_srf, u, v, 1, 1e-6)
+        
+        
+        # zwei richtungen (wie einheits vektoren) in die dann die 
+        # krümung in u und v richtung der Fläche angegeben wird
+        dir1 = gp_Dir(1,0,0)
+        dir2 = gp_Dir(1,0,0)
+        curvature.CurvatureDirections(dir1,dir2)
+        x1 = dir1.X()
+        y1 = dir1.Y()
+        z1 = dir1.Z()
+
+        if x1 < 1e-6:
+            x1 = 0
+        if y1 < 1e-6:
+            y1 = 0
+        if z1 < 1e-6:
+            z1 = 0
+        
+        # ist x == 1 und y == 0 und z == 0 dann handelt es sich um einen Zylinder
+        if x1 == 1 and y1 == 0 and z1 == 0:
+            print('Ist Zylinder')
+            pos = curvature.Value()
+            print('mittelpunkt:',round(pos.X(),2),',',round(pos.Y(),2),',',round(pos.Z(),2))
+            ais_shp.SetCustomColor(face, rgb_color(1, 0, 0))
+            #time.sleep(3)
+        #print('X1 old:',x1) 
+        #print('Y1 old:',y1)
+        #print('Z1 old:',z1)
+
+        #display.EraseAll()
+        #display.DisplayShape(face, update=True)
+
+        
         shp_idx += 1
-
-
-    display.EraseAll()
-    display.DisplayShape(shp, update=True)
-
-
-def import_as_multiple_shapes(event=None):
-    compound = read_step_file(os.path.join("..", "assets", "models", "as1_pe_203.stp"))
-    t = TopologyExplorer(compound)
-    display.EraseAll()
-    for solid in t.solids():
-        color = Quantity_Color(
-            random.random(), random.random(), random.random(), Quantity_TOC_RGB
-        )
-        display.DisplayColoredShape(solid, color)
+        #time.sleep(2)
+    display.Context.Display(ais_shp, True)
     display.FitAll()
 
-
-def exit(event=None):
-    sys.exit()
-
-
+"""
 if __name__ == "__main__":
     display, start_display, add_menu, add_function_to_menu = init_display()
     add_menu("STEP import")
     add_function_to_menu("STEP import", import_as_one_shape)
-    add_function_to_menu("STEP import", import_as_multiple_shapes)
+    #add_function_to_menu("STEP import", import_as_multiple_shapes)
     start_display()
-""" 
-
-#shp = read_step_file(os.path.join("..", "assets", "models", "as1_pe_203.stp"))
-shp = read_step_file(os.path.join("Antriebswelle.STEP"))
+    #import_as_one_shape()
+"""
 
 
-# Convert the shape to a TopoDS_Shape
-#topo_shape = topods.TopoDS_Shape(shp)
+if __name__ == "__main__":
+    face_locations_relative = []
+    # STEP datei einlesen. Wird als shape gespeichert
+    shp = read_step_file(os.path.join("Antriebswelle.STEP"))
 
-# Create a GProp_GProps object to store the properties
-gprops = GProp_GProps()
+    face_explorer = TopExp_Explorer(shp,TopAbs.TopAbs_FACE)
 
-# Compute properties
-#BRep_Tool.SurfaceProperties(topo_shape, gprops)
-brepgprop_VolumeProperties(shp, gprops)
+    # Create a GProp_GProps object to store the properties
+    gprops = GProp_GProps()
 
-# Get the center of mass
-print('+++++++++++++++++++++++++++++++++++++++++++++++++++++')
-print(gprops.Mass())
-cog = gprops.CentreOfMass()
-cog_x, cog_y, cog_z = cog.Coord()
-print("Center of mass: x = %f;y = %f;z = %f;" % (cog_x, cog_y, cog_z))
-print('+++++++++++++++++++++++++++++++++++++++++++++++++++++')
-print('Faces')
+    # Compute properties
+    #BRep_Tool.SurfaceProperties(topo_shape, gprops)
+    brepgprop_VolumeProperties(shp, gprops)
 
+    while face_explorer.More():
+        current_face = face_explorer.Current()
 
-# then loop over faces
-t = TopologyExplorer(shp)
-props = GProp_GProps()
-shp_idx = 1
-for face in t.faces():
-    Face = BRepGProp_Face(face)
-    Normal = Face.Normal()
-    #brepgprop_SurfaceProperties(face, props)
-    #face_surf = props.Mass()
-    #normal_vector = props.PrincipalProperties()
-    #print('Normal Vektor:',normal_vector)
-    print("Surface for face nbr %i : %f" % (shp_idx, face_surf))
-    shp_idx += 1
+        # Get the location (transformation) of the face relative to the shape
+        face_location_relative = TopLoc.TopLoc_Location()
+
+        print('Loc:',face_location_relative)
+
+        # If the face has a location (transformation)
+        if current_face.Location().IsEqual(face_location_relative, 1e-10):
+            face_locations_relative.append(face_location_relative)
+
+        face_explorer.Next()
+
+    # Print or use the list of relative face locations as needed
+    print("Relative Face Locations:", face_locations_relative)
