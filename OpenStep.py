@@ -64,16 +64,15 @@ def import_as_one_shape(event=None):
 
     for face in t.faces():
         print('---Face '+str(shp_idx)+'---')
-        #location = face.Location()
-        loc = face.Located()
         
-        print('Loc',face.Located())
         
         h_srf = BRep_Tool.Surface(face)
         u = 0.0
         v = 0.0
         curvature = GeomLProp_SLProps(h_srf, u, v, 1, 1e-6)
         
+        loc = curvature.Value()
+        print('Location:',loc.X(),',',loc.Y(),',',loc.Z())
         
         # zwei richtungen (wie einheits vektoren) in die dann die 
         # krümung in u und v richtung der Fläche angegeben wird
@@ -103,7 +102,8 @@ def import_as_one_shape(event=None):
         #print('Z1 old:',z1)
 
         #display.EraseAll()
-        #display.DisplayShape(face, update=True)
+        display.DisplayShape(face, update=True)
+        time.sleep(1)
 
         
         shp_idx += 1
@@ -111,7 +111,7 @@ def import_as_one_shape(event=None):
     display.Context.Display(ais_shp, True)
     display.FitAll()
 
-"""
+
 if __name__ == "__main__":
     display, start_display, add_menu, add_function_to_menu = init_display()
     add_menu("STEP import")
@@ -152,3 +152,4 @@ if __name__ == "__main__":
 
     # Print or use the list of relative face locations as needed
     print("Relative Face Locations:", face_locations_relative)
+"""
