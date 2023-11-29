@@ -34,6 +34,7 @@ from OCC.Core.AIS import AIS_ColoredShape
 from OCC.Display.OCCViewer import rgb_color
 
 def import_as_one_shape(event=None):
+    display.EraseAll()
     # STEP datei einlesen. Wird als shape gespeichert
     shp = read_step_file(os.path.join("Antriebswelle.STEP"))
 
@@ -62,9 +63,13 @@ def import_as_one_shape(event=None):
     props = GProp_GProps()
     shp_idx = 1
 
+    mindistanz = 999999999
+    mindistanzface = False
+
     for face in t.faces():
-        print('---Face '+str(shp_idx)+'---')
-        
+        #print('---Face '+str(shp_idx)+'---')
+        # für visu
+        ais_face = AIS_ColoredShape(face)
         
         h_srf = BRep_Tool.Surface(face)
         u = 0.0
@@ -72,7 +77,7 @@ def import_as_one_shape(event=None):
         curvature = GeomLProp_SLProps(h_srf, u, v, 1, 1e-6)
         
         loc = curvature.Value()
-        print('Location:',loc.X(),',',loc.Y(),',',loc.Z())
+        #print('Location:',loc.X(),',',loc.Y(),',',loc.Z())
         
         # zwei richtungen (wie einheits vektoren) in die dann die 
         # krümung in u und v richtung der Fläche angegeben wird
@@ -92,22 +97,39 @@ def import_as_one_shape(event=None):
         
         # ist x == 1 und y == 0 und z == 0 dann handelt es sich um einen Zylinder
         if x1 == 1 and y1 == 0 and z1 == 0:
-            print('Ist Zylinder')
+            print('Fläche ist Zylinder')
             pos = curvature.Value()
             print('mittelpunkt:',round(pos.X(),2),',',round(pos.Y(),2),',',round(pos.Z(),2))
             ais_shp.SetCustomColor(face, rgb_color(1, 0, 0))
-            #time.sleep(3)
-        #print('X1 old:',x1) 
-        #print('Y1 old:',y1)
-        #print('Z1 old:',z1)
+            ais_face.SetCustomColor(face, rgb_color(1, 0, 0))
+            # Distanz zwischen Schwerpunkt vom teil und dem punkt auf der Oberfläche ermitteln
+            vector_between = gp_Vec(loc,cog)
+            distance = vector_between.Magnitude()
+            print('Distnaz zum schwepunkt:',distance)
+            if mindistanz > distance:
+                mindistanz = distance
+                mindistanzface = face
 
-        #display.EraseAll()
-        display.DisplayShape(face, update=True)
-        time.sleep(1)
+
+        else:
+            ais_shp.SetCustomColor(face, rgb_color(0.135, 0.135, 0.135))
+            ais_face.SetCustomColor(face, rgb_color(0.135, 0.135, 0.135))
+
+        
+        
+        display.Context.Display(ais_face, True)
+        #display.DisplayShape(ais_face, update=True)
+        time.sleep(0.1)
 
         
         shp_idx += 1
         #time.sleep(2)
+    
+    # Fläche mit kleinster distanz grün makieren
+    ais_shp.SetCustomColor(mindistanzface, rgb_color(0, 1, 0))
+
+
+    display.EraseAll()
     display.Context.Display(ais_shp, True)
     display.FitAll()
 
@@ -117,3 +139,4 @@ if __name__ == "__main__":
     add_menu("STEP import")
     add_function_to_menu("STEP import", import_as_one_shape)
     #add_function_to_menu("STEP import", import_as_multiple_shapes)
+    start_display()
