@@ -13,11 +13,11 @@ Basiert auf dieser Anleitung: http://analysissitus.org/forum/index.php?threads/p
     Dafür die Conda promt öffnen. Ist ein Komandozeilen programm das mit conda installiert wird und
    kann wie jedes ander Programm in Windows gesucht werden.
 
-    conda create -n pyoccenv python=3.8
+    <code>conda create -n pyoccenv python=3.8</code>
    
-    conda activate pyoccenv
+    <code>conda activate pyoccenv</code>
    
-    conda install -c conda-forge pythonocc-core
+    <code>conda install -c conda-forge pythonocc-core</code>
 
 Starten ------------------------------------
 
@@ -29,7 +29,13 @@ angelegt haben und in der wir occ installiert haben.
 dafür  "conda activate pyoccenv " in der Komandozeile ausführen.
 Dann kann ganznormal mit "python xxxx.py" das programm gestartet werden
 
+Wenn nicht schon aktiv erst die python umgebung in der wir occ installiert haben aktivieren
 <code>conda activate pyoccenv</code>
+
+In dem Order wo dieses repo runtergeladen wurde dann die entsprechende python datei ausführen
+aktuell ist das die OpenStep.py
+
+<code>python OpenStep.py</code>
 
 Dokumentation-------------------------------
 
