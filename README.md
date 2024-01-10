@@ -1,5 +1,5 @@
 
-# OpenOCC -> sollte eigentlich pythonocc heisen...
+# PythonOCC 
 
 Installation------------------------------
 
@@ -28,6 +28,8 @@ Dort muss dann noch in die Virtual enviroment gewechselt werden die wir in der I
 angelegt haben und in der wir occ installiert haben.
 dafür  "conda activate pyoccenv " in der Komandozeile ausführen.
 Dann kann ganznormal mit "python xxxx.py" das programm gestartet werden
+
+<code>conda activate pyoccenv</code>
 
 Dokumentation-------------------------------
 
