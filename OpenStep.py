@@ -274,7 +274,8 @@ def face_algo_example(event=None):
     display.FitAll()
 
 
-if __name__ == "__main__": 
+if __name__ == "__main__":
+    print('Start')
     display, start_display, add_menu, add_function_to_menu = init_display()
     add_menu("STEP import")
     add_function_to_menu("STEP import", open_parts)
