@@ -4,34 +4,55 @@ import os.path
 import time
 from os import listdir
 from os.path import isfile, join
-
+# Trigonometrische Funktionen importieren
+from math import radians , degrees, sin, asin, cos, acos, tan, atan, pow, sqrt, pi
 
 from OCC.Extend.TopologyUtils import TopologyExplorer, TopoDS_Face
 from OCC.Extend.DataExchange import read_step_file
 
-from OCC.Core.gp import gp_Pnt, gp_Vec, gp_Dir
+from OCC.Core.gp import gp_Pnt, gp_Vec, gp_Dir, gp_Ax1, gp_Ax2, gp_OX2d
+
 
 # Topologie Pakete -----------------------------------------------------------------------------------
 # Ein Modell besteht in aller regel aus mehreen primitven formen. Eine Welle z.B. aus verschiedenen 
 # Zylindern und Kegeln und auch Endflächen. Die Topologie beschreibt dann wie diese Primitven Formen 
 # zusammengeschnürt werden müssen also wie diese Formen relativ zueinander stehen müssen
 # um das gesamte Modell darzustellen.
-from OCC.Core.TopoDS import topods, TopoDS_Face, TopoDS_Edge, TopoDS_Shape # DS == Data Struktur
+from OCC.Core.TopoDS import topods, TopoDS_Face, TopoDS_Edge, TopoDS_Shape, TopoDS_Wire, TopoDS_Edge # DS == Data Struktur
 from OCC.Core import TopLoc # paket bietet Ressourcen für den Umgang mit lokalen 3D-Koordinatensystemen
 # topologie pakete um die topologien zu bearbeiten 
 import OCC.Core.TopTools
 from OCC.Core.TopExp import TopExp_Explorer # Um Topologie eines gegenstand zu untersuchen
 from OCC.Core import BRepTools, TopAbs
+from OCC.Extend.TopologyUtils import WireExplorer
 
 
 # Bearbeitungs Pakete ---------------------------------------------------------------------------------
 from OCC.Core.BRep import BRep_Tool
-from OCC.Core.BRepGProp import brepgprop_SurfaceProperties, brepgprop_VolumeProperties, BRepGProp_Face, BRepGProp_Vinert
+#from OCC.Core.BRepGProp import brepgprop_SurfaceProperties, brepgprop_VolumeProperties, BRepGProp_Face, BRepGProp_Vinert
+from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeWire, BRepBuilderAPI_MakeFace
 from OCC.Core.GeomLProp import GeomLProp_SLProps # Um die krümmung einer Fläche zu bestimmen
 from OCC.Core.GProp import GProp_GProps
 from OCC.Core.BRepAdaptor import BRepAdaptor_Surface
-from OCC.Core.GeomAbs import GeomAbs_Cylinder, GeomAbs_Plane
+from OCC.Core.GeomAbs import GeomAbs_Cylinder, GeomAbs_Plane, GeomAbs_Circle
+
+from OCC.Core.Geom import Geom_Circle, Geom_BezierCurve, Geom_BSplineCurve, Geom_Plane
+from OCC.Core.GeomAPI import GeomAPI_PointsToBSpline, geomapi
+from OCC.Core.GeomConvert import GeomConvert_CompCurveToBSplineCurve
+
+
 from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeSphere
+
+#from OCC.Core.Geom2d import Geom2d_TrimmedCurve
+from OCC.Core.GCE2d import GCE2d_MakeCircle, GCE2d_MakeArcOfCircle, GCE2d_MakeLine
+import OCC.Core.Geom2dConvert as Converter2d
+from OCC.Core.Convert import Convert_TgtThetaOver2,  Convert_CircleToBSplineCurve
+
+
+
+from OCC.Core.TColgp import TColgp_Array1OfPnt
+
+from OCC.Core.gp import gp_Pnt2d, gp_Ax2d, gp_Dir2d, gp_Ax3, gp_Trsf, gp_Ax2, gp_Ax1, gp_Pln, gp_Circ
 
 # Visu Pakete --------------------------------------------------------------------------------------------
 from OCC.Display.SimpleGui import init_display
@@ -40,6 +61,8 @@ from OCC.Display.OCCViewer import rgb_color
 
 import tkinter as tk
 from tkinter import filedialog
+
+from OCC.Extend.ShapeFactory import make_vertex, make_edge2d
 
 
 class Part():
@@ -125,8 +148,6 @@ class Part():
                 print('Other surface type')
 
             shp_idx += 1
-
-
         
     def display(self,display):
         #display, start_display, add_menu, add_function_to_menu = init_display()
@@ -144,7 +165,267 @@ class Part():
         display.Context.Display(self.view_shape, True)
         display.FitAll()
 
+class Gripper():
+    def __init__(self):
+        pass
 
+    def create(self,min_radius,max_radius,zero_gap):
+        
+        WidthTip = 10 # 10mm Breite an dem bogen der dünnsten stelle des Fingers
+        WidthFlansch = 25 # 15mm Höhe des Flansch
+
+        # 1.    Punkte berechnen -------------------------------------------------------
+        #       
+        #       Punkte für inneren Bogen berechnen
+        #       Da der Bogen mit drei Punkten die auf den Bogen liegen definiert wird
+        #       Benötigen wir den Start mitel und endpunkt. Der Start und Endpunkt sind
+        #       die Punkte an denen die Wangen tangenzial anliegen. Der Mittelpunkt 
+        #       liegt in der Y achse und ist der Mittelpunkt der Achsen.
+        
+        Punkte = [] # Liste in der alle Punkte gespeichert werden
+
+        # P1 Tangenten Punkt 1 berechnen
+        Alpha = degrees(acos(min_radius/max_radius))
+        Beta = 90 - Alpha
+        Y1 = sin(radians(Alpha)) * min_radius
+        X1 = cos(radians(Alpha)) * -min_radius 
+        P1 = gp_Pnt2d(*(X1,Y1))
+
+        Punkte.append(P1)
+
+        print('Punkt 1: X:',X1,' Y:',Y1)
+
+        # P2  Mittelpunkt bestimmen
+        X2 = 0
+        Y2 = min_radius
+        P2 = gp_Pnt2d(*(X2,Y2))
+
+        Punkte.append(P2)
+
+        # P3 Tangenten Punkt 2 berechnen (Liegen symetrisch gegenüber Punkt 1)
+        Y3 = Y1
+        X3 = X1*-1
+        
+        P3 = gp_Pnt2d(*(X3,Y3))
+
+        Punkte.append(P3)
+
+        # P4 Endpunkt Wange links
+        Y4 = zero_gap
+        X4 = -(max_radius - (Y4 / tan(radians(Beta))))
+
+        P4 = gp_Pnt2d(X4,Y4)
+        Punkte.append(P4)
+
+        # P5 Spitze Wange rechts
+
+        X5 = min_radius
+        Y5 = (max_radius - min_radius) * tan(radians(Beta))
+
+        P5 = gp_Pnt2d(X5,Y5)
+        Punkte.append(P5)
+
+        # P6 Flansch unten
+
+        X6 = -max_radius
+        Y6 = zero_gap
+
+        P6 = gp_Pnt2d(X6,Y6)
+        Punkte.append(P6)
+
+        # P7 Flansch oben
+
+        # Hier müsste die höhe des Flansch anhand der Kräfte und des Materials berechnet werden
+        # wir gehen der einfach heit von 20mm aus
+        
+        Y7 = zero_gap + WidthFlansch
+        X7 = - max_radius
+
+        P7 = gp_Pnt2d(X7,Y7)
+        Punkte.append(P7)
+
+        # P8 Linkes Seite des oberen Bogens
+        # Auch hier müsste man die anhand der Kräfte die Stärke berechnen wir setzen einfach 10mm ein
+        r2 = min_radius + WidthTip # r2 ist der Radius des Ausenbogens
+
+        # Betrag des vektors zu P7 berechen
+        P7_ = sqrt(pow(X7,2)+pow(Y7,2))
+        gamma = degrees(acos(r2/P7_))
+        omega = degrees(atan(Y7/-X7))
+
+        theta = -(90 - (gamma + omega))
+        print('------------------------------------------')
+        print('gamme:',gamma)
+        print('omega',omega)
+        print('theta:',theta)
+        print('r2:',r2)
+        print('Alpha:',Alpha)
+        print('Beta:', Beta)
+        print('------------------------------------------')
+
+
+        
+        X8 = sin(radians(theta)) * r2
+        Y8 = cos(radians(theta)) * r2
+
+        P8 = gp_Pnt2d(X8,Y8)
+        Punkte.append(P8)
+
+        # P9 Mitte ausenbogen
+        
+        # P9 muss als dirtter Punkt zwischen P8 und P10 auf dem Bogen liegen.
+        # Wenn P8 eine positiven X wert hat dann darf P9 natrürlich nicht mit X = 0 dahinter stehen
+        # Darum muss P9 wie P8 auf dem Bogen berechnet werden
+        
+        if X8 > 0:
+            MiddleAngle = (Alpha - theta)/2
+            print('MiddleAngle:',MiddleAngle)
+            X9 = sin(radians(MiddleAngle)) * r2
+            Y9 = cos(radians(MiddleAngle)) * r2
+
+
+        else:
+            Y9 = r2
+            X9 = 0
+        P9 = gp_Pnt2d(X9,Y9)
+        Punkte.append(P9)
+
+        # P10 Bogen ausen rechter Punkt
+
+        X10 = sin(radians(Beta)) * r2
+        Y10 = cos(radians(Beta)) * r2
+
+        P10 = gp_Pnt2d(X10,Y10)
+        Punkte.append(P10)
+
+        # P11 Spitze oben
+        X11 = min_radius
+        Y11 = Y5 + (WidthTip / cos(radians(Beta)))
+
+        P11 = gp_Pnt2d(X11,Y11)
+        Punkte.append(P11)
+
+
+        # 2.  Edges erstellen -----------------------------------------------------------
+        Edges = []
+        Points3D = []
+        Verts = []
+
+        # da die MakeEdge funktion eine funktion für dreidimensionale objekte ist müssen
+        # die Punkte zu Vertecis erweitert werden also dreidimensionale punkte.
+        # Die Z koordinate ist hier einfach 0
+        for p in Punkte:
+            Points3D.append(gp_Pnt(p.X(), p.Y(), 0))
+            Verts.append(make_vertex(gp_Pnt(p.X(), p.Y(), 0)))
+
+ 
+
+        # Innen Bogen erzeugen
+
+        arc = GCE2d_MakeArcOfCircle(P1,P2,P3).Value() # typ: Geom2d_TrimmedCurve
+        BogenInnen2d = Converter2d.geom2dconvert_CurveToBSplineCurve(arc, Convert_TgtThetaOver2) # typ: Geom2d_BSplineCurve
+        
+        # Define a plane using a point and a normal direction.
+        # this is needed in the next step to create a edge out of the 2d curve
+        plane_point = gp_Pln(gp_Ax3())
+        plane = Geom_Plane(plane_point)
+
+        Edges.append(BRepBuilderAPI_MakeEdge(BogenInnen2d,plane))
+        
+        # Wange links erzeugen
+        Edges.append(BRepBuilderAPI_MakeEdge(Verts[3],Verts[0]))
+
+
+        # Wange rechts
+        Edges.append(BRepBuilderAPI_MakeEdge(Verts[2],Verts[4]))
+        
+        # Strecke zu Flansch 
+        Edges.append(BRepBuilderAPI_MakeEdge(Verts[5],Verts[3]))
+
+        # Flansch
+        Edges.append(BRepBuilderAPI_MakeEdge(Verts[6],Verts[5]))
+
+        # Rücken flansch zu Bogen
+        Edges.append(BRepBuilderAPI_MakeEdge(Verts[7],Verts[6]))
+
+        # Bogen ausen
+        
+        BogenAusen2d = Converter2d.geom2dconvert_CurveToBSplineCurve(GCE2d_MakeArcOfCircle(P10,P9,P8).Value(), Convert_TgtThetaOver2)
+        Edges.append(BRepBuilderAPI_MakeEdge(BogenAusen2d,plane))
+        
+
+        # Ende Ausenbogen zu Spitze
+        Edges.append(BRepBuilderAPI_MakeEdge(Verts[10],Verts[9]))
+
+        # Front Spitze
+        Edges.append(BRepBuilderAPI_MakeEdge(Verts[4],Verts[10]))
+        
+
+
+        # 3. Wire aus Edges erzeugen -----------------------------------------------------
+
+        
+        WireBuilder = BRepBuilderAPI_MakeWire()
+        
+        for edge in Edges:
+            WireBuilder.Add(edge.Edge())
+        
+        Wire = WireBuilder.Wire()
+
+        print('Wire closed:',Wire.Closed())
+         
+        # 4. Face aus Wire erzeugen ------------------------------------------------------
+        
+        
+        
+        circle = gp_Circ(gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), 80)
+        Edge1 = BRepBuilderAPI_MakeEdge(circle, 0, 1.5*pi)
+        Edge2 = BRepBuilderAPI_MakeEdge(gp_Pnt(0, -160, 0), gp_Pnt(40, -10, 0))
+        Edge3 = BRepBuilderAPI_MakeEdge(gp_Pnt(40, -10, 0), gp_Pnt(80, 0, 0))
+
+
+        ##TopoDS_Wire YellowWire
+        #
+        MW1 = BRepBuilderAPI_MakeWire(Edge1.Edge(), Edge3.Edge(), Edge2.Edge().Reversed())
+        while MW1.IsDone() == False:
+            print('Waiting')
+
+        yellow_wire = MW1.Wire()
+
+        if not WireBuilder.IsDone():
+            raise AssertionError("MW1 is not done.")
+        FaceBuilder = BRepBuilderAPI_MakeFace(yellow_wire)
+        Face = FaceBuilder.Face()
+        
+        #FaceBuilder = BRepBuilderAPI_MakeFace(Wire)
+        #Face = FaceBuilder.Face()
+
+        
+        # 5. Poligon aus Face durch extrusion erzeugen -----------------------------------
+  
+        # Display -----------------------------------------------------------------------
+        display, start_display, add_menu, add_function_to_menu = init_display()
+
+                # Punkte ausgeben (Debuging)
+        print('----------- Punkte -------------')
+        for i, p in enumerate(Punkte):
+            
+            print('Punkt',str(i+1),'X:',p.X(),' Y:',p.Y())
+            display.DisplayShape(p, update=True)
+            display.DisplayMessage(p, "P"+str(i+1))
+
+        print('--------------------------------')
+
+        # display edges
+        
+        for edge in Edges:
+            display.DisplayShape(edge.Edge(), update=True)
+        
+       
+        # display Wire
+        #display.DisplayShape(Wire)
+
+        start_display()
 
 
 def open_parts(event=None):
@@ -276,11 +557,18 @@ def face_algo_example(event=None):
 
 if __name__ == "__main__":
     print('Start')
+    """
     display, start_display, add_menu, add_function_to_menu = init_display()
     add_menu("STEP import")
     add_function_to_menu("STEP import", open_parts)
     add_function_to_menu("STEP import", face_algo_example)
     start_display()
+    """
+    
+    MyGripper = Gripper()
+    # Create the arc
+    MyGripper.create(min_radius=35,max_radius=50,zero_gap=2)
+
     print('END')
     
    
