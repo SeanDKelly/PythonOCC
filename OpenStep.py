@@ -30,7 +30,7 @@ from OCC.Extend.TopologyUtils import WireExplorer
 # Bearbeitungs Pakete ---------------------------------------------------------------------------------
 from OCC.Core.BRep import BRep_Tool
 #from OCC.Core.BRepGProp import brepgprop_SurfaceProperties, brepgprop_VolumeProperties, BRepGProp_Face, BRepGProp_Vinert
-from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeWire, BRepBuilderAPI_MakeFace
+
 from OCC.Core.GeomLProp import GeomLProp_SLProps # Um die krümmung einer Fläche zu bestimmen
 from OCC.Core.GProp import GProp_GProps
 from OCC.Core.BRepAdaptor import BRepAdaptor_Surface
@@ -40,8 +40,8 @@ from OCC.Core.Geom import Geom_Circle, Geom_BezierCurve, Geom_BSplineCurve, Geom
 from OCC.Core.GeomAPI import GeomAPI_PointsToBSpline, geomapi
 from OCC.Core.GeomConvert import GeomConvert_CompCurveToBSplineCurve
 
-
-from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeSphere
+from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeWire, BRepBuilderAPI_MakeFace
+from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeSphere, BRepPrimAPI_MakePrism
 
 #from OCC.Core.Geom2d import Geom2d_TrimmedCurve
 from OCC.Core.GCE2d import GCE2d_MakeCircle, GCE2d_MakeArcOfCircle, GCE2d_MakeLine
@@ -169,18 +169,15 @@ class Gripper():
     def __init__(self):
         pass
 
-    def create(self,min_radius,max_radius,zero_gap):
+    def create(self,min_radius,max_radius,zero_gap,flansch,width):
         
-        WidthTip = 10 # 10mm Breite an dem bogen der dünnsten stelle des Fingers
-        WidthFlansch = 25 # 15mm Höhe des Flansch
+        WidthTip = width # 10mm Breite an dem bogen der dünnsten stelle des Fingers
+        WidthFlansch = flansch # 15mm Höhe des Flansch
 
         # 1.    Punkte berechnen -------------------------------------------------------
         #       
-        #       Punkte für inneren Bogen berechnen
-        #       Da der Bogen mit drei Punkten die auf den Bogen liegen definiert wird
-        #       Benötigen wir den Start mitel und endpunkt. Der Start und Endpunkt sind
-        #       die Punkte an denen die Wangen tangenzial anliegen. Der Mittelpunkt 
-        #       liegt in der Y achse und ist der Mittelpunkt der Achsen.
+        #       Im ersten Schritt werden alle Punkte der Greiferkontur berechnet
+        
         
         Punkte = [] # Liste in der alle Punkte gespeichert werden
 
@@ -278,7 +275,7 @@ class Gripper():
         # Darum muss P9 wie P8 auf dem Bogen berechnet werden
         
         if X8 > 0:
-            MiddleAngle = (Alpha - theta)/2
+            MiddleAngle = (Beta - theta)/2
             print('MiddleAngle:',MiddleAngle)
             X9 = sin(radians(MiddleAngle)) * r2
             Y9 = cos(radians(MiddleAngle)) * r2
@@ -307,6 +304,13 @@ class Gripper():
 
 
         # 2.  Edges erstellen -----------------------------------------------------------
+        #
+        # Im zweiten Schritt werden Linien aus den Punkten erzeugt. Die meisten Linien sind
+        # Geraden womit immer zwischen zwei punkten eine Linie gezogen wird.
+        # Nachtrag: Es stellt sich raus das die aktuelle art und weise wie man bögen erzeugt
+        # so ist, das man zunächst einen Kreis an der gewnünschten Position mit dem gewünschten 
+        # Radius erzeugt und dann ahand eines Start und Stop winkels in einem weitern Schritt
+        # das gewünschte  Segment rausschneidet.
         Edges = []
         Points3D = []
         Verts = []
@@ -318,23 +322,14 @@ class Gripper():
             Points3D.append(gp_Pnt(p.X(), p.Y(), 0))
             Verts.append(make_vertex(gp_Pnt(p.X(), p.Y(), 0)))
 
- 
 
         # Innen Bogen erzeugen
-
-        arc = GCE2d_MakeArcOfCircle(P1,P2,P3).Value() # typ: Geom2d_TrimmedCurve
-        BogenInnen2d = Converter2d.geom2dconvert_CurveToBSplineCurve(arc, Convert_TgtThetaOver2) # typ: Geom2d_BSplineCurve
-        
-        # Define a plane using a point and a normal direction.
-        # this is needed in the next step to create a edge out of the 2d curve
-        plane_point = gp_Pln(gp_Ax3())
-        plane = Geom_Plane(plane_point)
-
-        Edges.append(BRepBuilderAPI_MakeEdge(BogenInnen2d,plane))
+            
+        circle = gp_Circ(gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), min_radius)
+        Edges.append(BRepBuilderAPI_MakeEdge(circle, -radians(Beta)+pi/2, radians(Beta)+pi/2))
         
         # Wange links erzeugen
         Edges.append(BRepBuilderAPI_MakeEdge(Verts[3],Verts[0]))
-
 
         # Wange rechts
         Edges.append(BRepBuilderAPI_MakeEdge(Verts[2],Verts[4]))
@@ -349,11 +344,10 @@ class Gripper():
         Edges.append(BRepBuilderAPI_MakeEdge(Verts[7],Verts[6]))
 
         # Bogen ausen
-        
-        BogenAusen2d = Converter2d.geom2dconvert_CurveToBSplineCurve(GCE2d_MakeArcOfCircle(P10,P9,P8).Value(), Convert_TgtThetaOver2)
-        Edges.append(BRepBuilderAPI_MakeEdge(BogenAusen2d,plane))
-        
 
+        circle = gp_Circ(gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), r2)
+        Edges.append(BRepBuilderAPI_MakeEdge(circle, -radians(Beta)+pi/2, -radians(theta)+pi/2))
+        
         # Ende Ausenbogen zu Spitze
         Edges.append(BRepBuilderAPI_MakeEdge(Verts[10],Verts[9]))
 
@@ -363,6 +357,8 @@ class Gripper():
 
 
         # 3. Wire aus Edges erzeugen -----------------------------------------------------
+        # Jetzt werden die einzelnen Linien zu einem sogenannten Wire verbunden.
+        # Der Wire bildet dann unsere Kontur des Greifers.
 
         
         WireBuilder = BRepBuilderAPI_MakeWire()
@@ -375,38 +371,27 @@ class Gripper():
         print('Wire closed:',Wire.Closed())
          
         # 4. Face aus Wire erzeugen ------------------------------------------------------
+        # Aus dem Wire also der Kontur kann dann eine Fläche erzeugt werden, die die Kontur ausfüllt.
         
-        
-        
-        circle = gp_Circ(gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), 80)
-        Edge1 = BRepBuilderAPI_MakeEdge(circle, 0, 1.5*pi)
-        Edge2 = BRepBuilderAPI_MakeEdge(gp_Pnt(0, -160, 0), gp_Pnt(40, -10, 0))
-        Edge3 = BRepBuilderAPI_MakeEdge(gp_Pnt(40, -10, 0), gp_Pnt(80, 0, 0))
-
-
-        ##TopoDS_Wire YellowWire
-        #
-        MW1 = BRepBuilderAPI_MakeWire(Edge1.Edge(), Edge3.Edge(), Edge2.Edge().Reversed())
-        while MW1.IsDone() == False:
-            print('Waiting')
-
-        yellow_wire = MW1.Wire()
-
-        if not WireBuilder.IsDone():
-            raise AssertionError("MW1 is not done.")
-        FaceBuilder = BRepBuilderAPI_MakeFace(yellow_wire)
+        FaceBuilder = BRepBuilderAPI_MakeFace(Wire)
         Face = FaceBuilder.Face()
         
-        #FaceBuilder = BRepBuilderAPI_MakeFace(Wire)
-        #Face = FaceBuilder.Face()
-
         
         # 5. Poligon aus Face durch extrusion erzeugen -----------------------------------
+        # Als letztes wird wie man es aus jedem anderen CAD kennt. die Fläche extrudiert um einen
+        # Körper daraus zu Bilden.
+
+        PrismBuilder = BRepPrimAPI_MakePrism(Face, gp_Vec(gp_Pnt(0.0, 0.0, 0.0), gp_Pnt(0.0, 0.0, 15.0)))
+        Prism = PrismBuilder.Shape()
+        AISPrism = AIS_ColoredShape(Prism)
+        AISPrism.SetColor(rgb_color(0.2, 0.2, 0.2))
   
         # Display -----------------------------------------------------------------------
+        # Hier geben wir das ganze einfach nur auf dem 3D view port aus das wir das ding sehen können
+
         display, start_display, add_menu, add_function_to_menu = init_display()
 
-                # Punkte ausgeben (Debuging)
+        # Punkte anzeigen
         print('----------- Punkte -------------')
         for i, p in enumerate(Punkte):
             
@@ -422,9 +407,11 @@ class Gripper():
             display.DisplayShape(edge.Edge(), update=True)
         
        
-        # display Wire
-        #display.DisplayShape(Wire)
-
+        # display prism
+        display.Context.Display(AISPrism, True)
+        
+        # Viewport so ausrichten das alles zu sehen ist
+        display.FitAll()
         start_display()
 
 
@@ -567,7 +554,7 @@ if __name__ == "__main__":
     
     MyGripper = Gripper()
     # Create the arc
-    MyGripper.create(min_radius=35,max_radius=50,zero_gap=2)
+    MyGripper.create(min_radius=35,max_radius=50,zero_gap=3,flansch=25,width=10)
 
     print('END')
     
