@@ -388,6 +388,7 @@ class Gripper():
             print('Punkt',str(i+1),'X:',p.X(),' Y:',p.Y())
             display.DisplayShape(p, update=True)
             display.DisplayMessage(p, "P"+str(i+1))
+        time.sleep(2)
 
         print('--------------------------------')
 
@@ -395,7 +396,11 @@ class Gripper():
         
         for edge in Edges:
             display.DisplayShape(edge.Edge(), update=True)
+        time.sleep(2)
         
+        # display face
+        display.DisplayShape(Face, update=True)
+        time.sleep(2)
        
         # display prism
         display.Context.Display(AISPrism, True)
@@ -528,7 +533,7 @@ def face_select_algo_example(event=None):
 
 if __name__ == "__main__":
     print('Start')
-    
+    """
     display, start_display, add_menu, add_function_to_menu = init_display()
     add_menu("STEP import")
     add_function_to_menu("STEP import", open_parts)
@@ -538,8 +543,8 @@ if __name__ == "__main__":
     
     MyGripper = Gripper()
     # Create the arc
-    MyGripper.create(min_radius=35,max_radius=50,zero_gap=3,flansch=45,width=25)
-    """
+    MyGripper.create(min_radius=15,max_radius=50,zero_gap=3,flansch=20,width=10)
+    
 
     print('END')
     
