@@ -18,8 +18,10 @@ from OCC.Core.gp import gp_Pnt, gp_Vec, gp_Dir, gp_Ax1, gp_Ax2, gp_OX2d
 # Zylindern und Kegeln und auch Endflächen. Die Topologie beschreibt dann wie diese Primitven Formen 
 # zusammengeschnürt werden müssen also wie diese Formen relativ zueinander stehen müssen
 # um das gesamte Modell darzustellen.
+
 from OCC.Core.TopoDS import topods, TopoDS_Face, TopoDS_Edge, TopoDS_Shape, TopoDS_Wire, TopoDS_Edge # DS == Data Struktur
 from OCC.Core import TopLoc # paket bietet Ressourcen für den Umgang mit lokalen 3D-Koordinatensystemen
+
 # topologie pakete um die topologien zu bearbeiten 
 import OCC.Core.TopTools
 from OCC.Core.TopExp import TopExp_Explorer # Um Topologie eines gegenstand zu untersuchen
@@ -28,29 +30,17 @@ from OCC.Extend.TopologyUtils import WireExplorer
 
 
 # Bearbeitungs Pakete ---------------------------------------------------------------------------------
+# Das sind alles Funktionen mit denen man Modelle baut.
 from OCC.Core.BRep import BRep_Tool
-#from OCC.Core.BRepGProp import brepgprop_SurfaceProperties, brepgprop_VolumeProperties, BRepGProp_Face, BRepGProp_Vinert
 
 from OCC.Core.GeomLProp import GeomLProp_SLProps # Um die krümmung einer Fläche zu bestimmen
 from OCC.Core.GProp import GProp_GProps
+from OCC.Core.BRepGProp import brepgprop_VolumeProperties
 from OCC.Core.BRepAdaptor import BRepAdaptor_Surface
 from OCC.Core.GeomAbs import GeomAbs_Cylinder, GeomAbs_Plane, GeomAbs_Circle
 
-from OCC.Core.Geom import Geom_Circle, Geom_BezierCurve, Geom_BSplineCurve, Geom_Plane
-from OCC.Core.GeomAPI import GeomAPI_PointsToBSpline, geomapi
-from OCC.Core.GeomConvert import GeomConvert_CompCurveToBSplineCurve
-
 from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeWire, BRepBuilderAPI_MakeFace
 from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeSphere, BRepPrimAPI_MakePrism
-
-#from OCC.Core.Geom2d import Geom2d_TrimmedCurve
-from OCC.Core.GCE2d import GCE2d_MakeCircle, GCE2d_MakeArcOfCircle, GCE2d_MakeLine
-import OCC.Core.Geom2dConvert as Converter2d
-from OCC.Core.Convert import Convert_TgtThetaOver2,  Convert_CircleToBSplineCurve
-
-
-
-from OCC.Core.TColgp import TColgp_Array1OfPnt
 
 from OCC.Core.gp import gp_Pnt2d, gp_Ax2d, gp_Dir2d, gp_Ax3, gp_Trsf, gp_Ax2, gp_Ax1, gp_Pln, gp_Circ
 
@@ -438,18 +428,17 @@ def open_parts(event=None):
 
     return parts
 
-def face_algo_example(event=None):
+def face_select_algo_example(event=None):
     display.EraseAll()
     # STEP datei einlesen. Wird als shape gespeichert
-    shp = read_step_file(os.path.join("C:/Users/theja/Documents/GIT/OpenOCC/Parts/Antriebswelle.STEP"))
+    #shp = read_step_file(os.path.join("C:/Users/theja/Documents/GIT/OpenOCC/Parts/Antriebswelle.STEP"))
+    shp = read_step_file(os.path.join("Parts/Antriebswelle.STEP"))
+    print('Shape type:',type(shp))
     
     ais_shp = AIS_ColoredShape(shp)
 
     # Create a GProp_GProps object to store the properties
     gprops = GProp_GProps()
-
-    # Compute properties
-    #BRep_Tool.SurfaceProperties(topo_shape, gprops)
     brepgprop_VolumeProperties(shp, gprops)
 
     # Get the center of mass
@@ -479,8 +468,6 @@ def face_algo_example(event=None):
         # Get the surface of the face
         surface = BRep_Tool.Surface(face)
 
-        
-
         # Create a surface adaptor
         surface_adaptor = BRepAdaptor_Surface(face)
 
@@ -496,7 +483,6 @@ def face_algo_example(event=None):
         if surface_adaptor.GetType() == GeomAbs_Cylinder:
             print('Is a cylinder')
             
-            
             print('mittelpunkt:',round(center_coordinate.X(),2),',',round(center_coordinate.Y(),2),',',round(center_coordinate.Z(),2))
             ais_shp.SetCustomColor(face, rgb_color(1, 0, 0))
             ais_face.SetCustomColor(face, rgb_color(1, 0, 0))
@@ -508,7 +494,7 @@ def face_algo_example(event=None):
                 mindistanz = distance
                 mindistanzface = face
 
-            # Create a sphere at the specified coordinates
+            # Create a sphere at the specified coordinates to show where the center is
             sphere_builder = BRepPrimAPI_MakeSphere(center_coordinate, 2.0)
             sphere_shape = sphere_builder.Shape()
             ais_sphere = AIS_ColoredShape(sphere_shape)
@@ -529,13 +515,11 @@ def face_algo_example(event=None):
         #display.DisplayShape(ais_face, update=True)
         time.sleep(0.2)
 
-        
         shp_idx += 1
         #time.sleep(2)
     
     # Fläche mit kleinster distanz grün makieren
     ais_shp.SetCustomColor(mindistanzface, rgb_color(0, 1, 0))
-
 
     display.EraseAll()
     display.Context.Display(ais_shp, True)
@@ -544,17 +528,18 @@ def face_algo_example(event=None):
 
 if __name__ == "__main__":
     print('Start')
-    """
+    
     display, start_display, add_menu, add_function_to_menu = init_display()
     add_menu("STEP import")
     add_function_to_menu("STEP import", open_parts)
-    add_function_to_menu("STEP import", face_algo_example)
+    add_function_to_menu("STEP import", face_select_algo_example)
     start_display()
     """
     
     MyGripper = Gripper()
     # Create the arc
-    MyGripper.create(min_radius=35,max_radius=50,zero_gap=3,flansch=25,width=10)
+    MyGripper.create(min_radius=35,max_radius=50,zero_gap=3,flansch=45,width=25)
+    """
 
     print('END')
     
